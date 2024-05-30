@@ -54,11 +54,11 @@ public class FrontController extends HttpServlet {
             } else if (file.getName().endsWith(".class")) {
                 String className = packageName + '.' + file.getName().substring(0, file.getName().length() - 6);
                 Class<?> clazz = Class.forName(className);
-                if (clazz.isAnnotationPresent(Controller.class)) { // get annoted class
+                if (clazz.isAnnotationPresent(Controller.class)) {
                     Method[] methods = clazz.getDeclaredMethods();
                     this.controllers.add(clazz);
                     for (Method method : methods) {
-                        if (method.isAnnotationPresent(Get.class)) { // get annoted method of the class annoted
+                        if (method.isAnnotationPresent(Get.class)) {
                             this.urls.put(method.getAnnotation(Get.class).url(),
                                     new Mapping(method.getName(), clazz.getName()));
                         }
@@ -75,11 +75,17 @@ public class FrontController extends HttpServlet {
 
         try {
             out = resp.getWriter();
-            out.println(uri.replace(context_path, ""));
-            Mapping m = this.urls.get(uri.replace(context_path, ""));
-            out.println(uri.replace(context_path, ""));
+            String path = uri.replace(context_path, "");
+            Mapping m = this.urls.get(path);
+
             if (m != null) {
-                out.println(m.str());
+                Class<?> clazz = Class.forName(m.getClassName());
+                Object instance = clazz.getDeclaredConstructor().newInstance();
+                Method method = clazz.getDeclaredMethod(m.getMethod());
+                Object result = method.invoke(instance);
+                out.println(result.toString());
+            } else {
+                out.println("No mapping found for this URL.");
             }
         } catch (Exception e) {
             out.println(e.getMessage());
