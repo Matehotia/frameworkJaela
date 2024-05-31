@@ -9,8 +9,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
 import com.annotation.Controller;
 import com.annotation.Get;
+import com.model.ModelView;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -68,7 +70,8 @@ public class FrontController extends HttpServlet {
         }
     }
 
-    protected void processrequest(HttpServletRequest req, HttpServletResponse resp) {
+    protected void processrequest(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
         PrintWriter out = null;
         String context_path = req.getContextPath();
         String uri = req.getRequestURI();
@@ -83,7 +86,18 @@ public class FrontController extends HttpServlet {
                 Object instance = clazz.getDeclaredConstructor().newInstance();
                 Method method = clazz.getDeclaredMethod(m.getMethod());
                 Object result = method.invoke(instance);
-                out.println(result.toString());
+
+                if (result instanceof String) {
+                    out.println(result);
+                } else if (result instanceof ModelView) {
+                    ModelView modelView = (ModelView) result;
+                    for (Map.Entry<String, Object> entry : modelView.getData().entrySet()) {
+                        req.setAttribute(entry.getKey(), entry.getValue());
+                    }
+                    req.getRequestDispatcher(modelView.getUrl()).forward(req, resp);
+                } else {
+                    out.println("Non reconnu");
+                }
             } else {
                 out.println("No mapping found for this URL.");
             }
