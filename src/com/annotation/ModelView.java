@@ -1,29 +1,25 @@
-package com.model;
+package com.mapping;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class ModelView {
     private String url;
-    private HashMap<String, Object> data;
+    private Map<String, Object> data = new HashMap<>();
 
     public ModelView(String url) {
         this.url = url;
-        this.data = new HashMap<>();
     }
 
     public String getUrl() {
         return url;
     }
 
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public HashMap<String, Object> getData() {
+    public Map<String, Object> getData() {
         return data;
     }
 
-    public void addObject(String key, Object value) {
-        this.data.put(key, value);
+    public void addObject(String name, Object value) {
+        data.put(name, value);
     }
 }

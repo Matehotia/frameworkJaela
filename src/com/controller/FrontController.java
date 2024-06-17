@@ -1,120 +1,158 @@
 package com.controller;
 
+import com.annotation.Annotation;
+import com.annotation.GET;
+import com.mapping.Mapping;
+import com.mapping.ModelView;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import com.annotation.Controller;
-import com.annotation.Get;
-import com.model.ModelView;
-
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import util.Mapping;
-
 public class FrontController extends HttpServlet {
 
-    private Map<String, Mapping> urls;
-    private List<Class<?>> controllers;
-    private String _package;
+    private Map<String, Mapping> urlMappings = new HashMap<>();
 
+    @Override
     public void init() throws ServletException {
         try {
-            String p = this.getInitParameter("app.controllers.packageName").replace(".", "/");
-            this._package = p;
-            this.urls = new HashMap<>();
-            this.controllers = new ArrayList<>();
-            this.scan();
+            findControllerClasses();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            logException(e);
+            throw new ServletException(e);
         }
     }
 
-    protected void scan() throws ClassNotFoundException {
-        if (this._package == null || this._package.isEmpty()) {
-            throw new ClassNotFoundException("Controller package not specified");
+    public void findControllerClasses() throws Exception {
+        String controllerPackage = getServletConfig().getInitParameter("controller");
+        if (controllerPackage == null || controllerPackage.isEmpty()) {
+            throw new Exception("Controller package not specified");
         }
-        File directory = new File(getServletContext().getRealPath("/WEB-INF/classes/" + this._package));
+
+        String path = controllerPackage.replace('.', '/');
+        File directory = new File(getServletContext().getRealPath("/WEB-INF/classes/" + path));
+
         if (!directory.exists() || !directory.isDirectory()) {
-            throw new ClassNotFoundException("Controller Package \"" + this._package + "\" not Found");
+            throw new Exception("Package directory not found: " + directory.getAbsolutePath());
         }
-        scan_Find_Classes(this._package, directory);
+
+        findClassesInDirectory(controllerPackage, directory);
     }
 
-    protected void scan_Find_Classes(String packageName, File directory) throws ClassNotFoundException {
+    private void findClassesInDirectory(String packageName, File directory) throws Exception {
         for (File file : Objects.requireNonNull(directory.listFiles())) {
             if (file.isDirectory()) {
-                scan_Find_Classes(packageName + "." + file.getName(), file);
+                findClassesInDirectory(packageName + "." + file.getName(), file);
             } else if (file.getName().endsWith(".class")) {
                 String className = packageName + '.' + file.getName().substring(0, file.getName().length() - 6);
-                Class<?> clazz = Class.forName(className);
-                if (clazz.isAnnotationPresent(Controller.class)) {
-                    Method[] methods = clazz.getDeclaredMethods();
-                    this.controllers.add(clazz);
-                    for (Method method : methods) {
-                        if (method.isAnnotationPresent(Get.class)) {
-                            this.urls.put(method.getAnnotation(Get.class).url(),
-                                    new Mapping(method.getName(), clazz.getName()));
-                        }
-                    }
-                }
+                addClassIfController(className);
             }
         }
     }
 
-    protected void processrequest(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException {
-        PrintWriter out = null;
-        String context_path = req.getContextPath();
-        String uri = req.getRequestURI();
-
+    private void addClassIfController(String className) throws Exception {
         try {
-            out = resp.getWriter();
-            String path = uri.replace(context_path, "");
-            Mapping m = this.urls.get(path);
+            Class<?> clazz = Class.forName(className);
+            if (clazz.isAnnotationPresent(Annotation.class)) {
+                for (Method method : clazz.getDeclaredMethods()) {
+                    if (method.isAnnotationPresent(GET.class)) {
+                        GET getAnnotation = method.getAnnotation(GET.class);
+                        String url = getAnnotation.value();
+                        if (urlMappings.containsKey(url)) {
+                            throw new Exception("Duplicate URL mapping found for: " + url);
+                        }
+                        Mapping mapping = new Mapping(clazz.getName(), method.getName());
+                        urlMappings.put(url, mapping);
+                    }
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            throw new Exception("Class not found: " + className, e);
+        }
+    }
 
-            if (m != null) {
-                Class<?> clazz = Class.forName(m.getClassName());
+    protected void processRequested(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+        PrintWriter out = res.getWriter();
+        try {
+            String url = req.getRequestURL().toString();
+            String contextPath = req.getContextPath();
+            String path = url.substring(url.indexOf(contextPath) + contextPath.length());
+
+            out.println("URL: " + url);
+            out.println("Path: " + path);
+
+            Mapping mapping = urlMappings.get(path);
+            if (mapping != null) {
+                out.println("Mapping trouvé : " + mapping);
+
+                // Récupérer la classe et la méthode
+                Class<?> clazz = Class.forName(mapping.getClassName());
+                Method method = clazz.getDeclaredMethod(mapping.getMethodName());
+
+                // Créer une instance de la classe
                 Object instance = clazz.getDeclaredConstructor().newInstance();
-                Method method = clazz.getDeclaredMethod(m.getMethod());
+
+                // Invoquer la méthode sur l'instance
                 Object result = method.invoke(instance);
 
                 if (result instanceof String) {
-                    out.println(result);
+                    out.println("Résultat de la méthode : " + result);
                 } else if (result instanceof ModelView) {
                     ModelView modelView = (ModelView) result;
-                    for (Map.Entry<String, Object> entry : modelView.getData().entrySet()) {
+                    String viewUrl = modelView.getUrl();
+                    Map<String, Object> data = modelView.getData();
+
+                    // Boucle sur les données pour les mettre dans la requête
+                    for (Map.Entry<String, Object> entry : data.entrySet()) {
                         req.setAttribute(entry.getKey(), entry.getValue());
                     }
-                    req.getRequestDispatcher(modelView.getUrl()).forward(req, resp);
+
+                    // Dispatcher vers l'URL de la vue
+                    RequestDispatcher dispatcher = req.getRequestDispatcher(viewUrl);
+                    dispatcher.forward(req, res);
                 } else {
-                    out.println("Non reconnu");
+                    throw new Exception("Type de retour non reconnu : " + result.getClass().getName());
                 }
             } else {
-                out.println("No mapping found for this URL.");
+                throw new Exception("Aucune méthode associée à ce chemin");
             }
         } catch (Exception e) {
-            out.println(e.getMessage());
-        } finally {
-            if (out != null) {
-                out.close();
-            }
+            logException(e);
+            sendErrorPage(res, e.getMessage());
         }
     }
 
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        processrequest(req, resp);
+    private void logException(Exception e) {
+        e.printStackTrace(System.err);
     }
 
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        processrequest(req, resp);
+    private void sendErrorPage(HttpServletResponse res, String errorMessage) throws IOException {
+        res.setContentType("text/html");
+        PrintWriter out = res.getWriter();
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>Error Page</title>");
+        out.println("</head>");
+        out.println("<body>");
+        out.println("<h1>Une erreur est survenue</h1>");
+        out.println("<p>" + errorMessage + "</p>");
+        out.println("</body>");
+        out.println("</html>");
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        processRequested(req, res);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        processRequested(req, res);
     }
 }
