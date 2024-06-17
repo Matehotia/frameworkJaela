@@ -1,32 +1,35 @@
-package util;
+package com.mapping;
 
 public class Mapping {
-    String method;
-    String controller;
+    private String className;
+    private String methodName;
 
-    public Mapping(String method, String controller) {
-        setController(controller);
-        setMethod(method);
+    public Mapping(String className, String methodName) {
+        this.className = className;
+        this.methodName = methodName;
     }
 
-    public String getMethod() {
-        return method;
+    public String getClassName() {
+        return className;
     }
 
-    public void setMethod(String method) {
-        this.method = method;
+    public void setClassName(String className) {
+        this.className = className;
     }
 
-    public String getController() {
-        return controller;
+    public String getMethodName() {
+        return methodName;
     }
 
-    public void setController(String controller) {
-        this.controller = controller;
+    public void setMethodName(String methodName) {
+        this.methodName = methodName;
     }
 
-    public String str() {
-        return "Method : " + this.getMethod() + " Controller " + this.getController();
+    @Override
+    public String toString() {
+        return "Mapping{" +
+                "className='" + className + '\'' +
+                ", methodName='" + methodName + '\'' +
+                '}';
     }
-
 }
