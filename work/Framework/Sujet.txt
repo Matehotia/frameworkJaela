@@ -1,0 +1,12 @@
+Sprint 8 : Gestion et utilisation de session
+Côté Framework :
+Étape 1 :
+- Créer une classe MySession ayant comme seul attribut HttpSession session
+- Ajouter fonctions get(String key), add(String key, Object objet), delete(String key)
+Étape 2 :
+- A l’appel des méthodes des controllers de l’utilisateur, pendant la génération des arguments, vérifier si le paramètre est de type MySession et dans ce cas, créer un MySession avec req.getSession()
+Côté test :
+- Créer un formulaire de login (identifiant,mot de passe)
+- Quand la personne se connecte, elle accède à une liste de données propres à son identifiant
+-Ajouter un bouton déconnexion qui supprime les données de la session
+Vous pouvez utiliser n’importe quel type pour les listes de données mais sans utiliser de système de base de donnée
