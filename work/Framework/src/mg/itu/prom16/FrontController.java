@@ -33,7 +33,6 @@ public class FrontController extends HttpServlet {
             throw new Exception("Package directory does not exist: " + bin_path);
         }
 
-        // Verify in the package if controllers exist
         boolean hasController = false;
 
         for (File fichier : b.listFiles()) {
@@ -65,8 +64,6 @@ public class FrontController extends HttpServlet {
     @Override
     public void init() throws ServletException {
         super.init();
-        // Defer the package initialization to the first request to display custom
-        // errors
     }
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse resp)
@@ -76,7 +73,6 @@ public class FrontController extends HttpServlet {
 
         PrintWriter out = resp.getWriter();
         try {
-            // Initialize controllers if not already initialized
             if (urlMappings.isEmpty()) {
                 try {
                     getListeControlleurs(getServletContext().getInitParameter("controllerPackage"));
@@ -85,8 +81,6 @@ public class FrontController extends HttpServlet {
                     return;
                 }
             }
-
-            // Check if no URL path is provided and just return without an error
             if (urlPath == null || urlPath.isEmpty() || urlPath.equals("/")) {
                 resp.setContentType("text/html;charset=UTF-8");
                 out.println("<!DOCTYPE html>");
@@ -189,7 +183,7 @@ public class FrontController extends HttpServlet {
         out.println("<!DOCTYPE html>");
         out.println("<html>");
         out.println("<head>");
-        out.println("<title>Error</title>");
+        out.println("<title>error</title>");
         out.println("</head>");
         out.println("<body>");
         out.println("<h1>Error: " + e.getMessage() + "</h1>");
